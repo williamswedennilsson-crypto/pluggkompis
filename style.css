@@ -1,0 +1,167 @@
+:root {
+  --bg: #0f1117;
+  --surface: #181b24;
+  --surface-2: #222634;
+  --border: #2d3244;
+  --text: #e6e8ef;
+  --muted: #8b91a5;
+  --accent: #7c6cff;
+  --accent-hover: #9284ff;
+  --good: #3ecf8e;
+  --bad: #ff5c7a;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { margin-top: 0; }
+
+nav { display: flex; gap: .5rem; }
+
+main {
+  max-width: 760px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+button {
+  font: inherit;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: .6rem 1.1rem;
+  cursor: pointer;
+  transition: background .15s, transform .05s;
+}
+button:hover { background: var(--accent-hover); }
+button:active { transform: scale(.97); }
+button.secondary { background: var(--surface-2); border: 1px solid var(--border); }
+button.secondary:hover { background: var(--border); }
+button.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+button.danger:hover { background: var(--bad); color: #fff; }
+button.small { padding: .35rem .8rem; font-size: .9rem; }
+
+.tab { background: transparent; color: var(--muted); }
+.tab:hover { background: var(--surface-2); color: var(--text); }
+.tab.active { background: var(--surface-2); color: var(--text); }
+
+.badge {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: .75rem;
+  padding: 0 .5rem;
+  margin-left: .25rem;
+}
+
+input, textarea {
+  font: inherit;
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .7rem .9rem;
+}
+input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124, 108, 255, .25);
+}
+
+textarea { min-height: 320px; resize: vertical; }
+
+.view { display: none; }
+.view.active { display: block; animation: fade .2s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+.hidden { display: none !important; }
+.muted, .hint { color: var(--muted); }
+.center { text-align: center; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.panel, .card-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.card-form { display: grid; gap: 1rem; }
+.card-form label { display: grid; gap: .35rem; color: var(--muted); font-size: .9rem; }
+.card-form button { justify-self: start; }
+
+.card-list { list-style: none; padding: 0; display: grid; gap: .75rem; }
+.card-list li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+.card-list .q { font-weight: 600; }
+.card-list .a { color: var(--muted); }
+.card-list .del {
+  background: transparent;
+  color: var(--muted);
+  padding: .2rem .5rem;
+  font-size: 1.1rem;
+}
+.card-list .del:hover { color: var(--bad); background: var(--surface-2); }
+
+.quiz-top { display: flex; justify-content: space-between; color: var(--muted); }
+.progress { height: 6px; background: var(--surface-2); border-radius: 999px; margin: .75rem 0 1.5rem; overflow: hidden; }
+#progress-bar { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+
+.question { font-size: 1.4rem; font-weight: 600; margin: 0 0 1.25rem; }
+
+#answer-form { display: flex; gap: .5rem; }
+
+.feedback {
+  margin-top: 1rem;
+  padding: .9rem 1rem;
+  border-radius: 8px;
+  border: 1px solid;
+}
+.feedback.good { color: var(--good); border-color: var(--good); background: rgba(62, 207, 142, .08); }
+.feedback.bad { color: var(--bad); border-color: var(--bad); background: rgba(255, 92, 122, .08); }
+
+#after-answer { justify-content: flex-end; }
+
+.big { font-size: 2.5rem; font-weight: 700; margin: .5rem 0; }

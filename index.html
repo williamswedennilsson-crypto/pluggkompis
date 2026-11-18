@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pluggkompis</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>📚 Pluggkompis</h1>
+    <nav>
+      <button class="tab active" data-view="notes">Anteckningar</button>
+      <button class="tab" data-view="cards">Flashcards <span id="card-count" class="badge">0</span></button>
+      <button class="tab" data-view="quiz">Quiz</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Anteckningar -->
+    <section id="notes" class="view active">
+      <h2>Anteckningar</h2>
+      <p class="hint">Klistra in dina anteckningar här. De sparas automatiskt.</p>
+      <textarea id="notes-text" placeholder="Klistra in eller skriv dina anteckningar..."></textarea>
+      <div class="row">
+        <span id="notes-status" class="muted"></span>
+        <button id="notes-to-cards" class="secondary">Skapa kort från rader med "fråga - svar"</button>
+      </div>
+    </section>
+
+    <!-- Flashcards -->
+    <section id="cards" class="view">
+      <h2>Flashcards</h2>
+      <form id="card-form" class="card-form">
+        <label>Fråga
+          <input id="q-input" type="text" placeholder="T.ex. Vad är huvudstaden i Norge?" required>
+        </label>
+        <label>Svar
+          <input id="a-input" type="text" placeholder="T.ex. Oslo" required>
+        </label>
+        <button type="submit">Lägg till kort</button>
+      </form>
+      <div class="row">
+        <span class="muted" id="cards-empty">Inga kort än. Lägg till ditt första ovan!</span>
+        <button id="clear-cards" class="danger small">Radera alla</button>
+      </div>
+      <ul id="card-list" class="card-list"></ul>
+    </section>
+
+    <!-- Quiz -->
+    <section id="quiz" class="view">
+      <h2>Quiz</h2>
+
+      <div id="quiz-start" class="panel center">
+        <p>Öva på dina kort. Skriv ditt svar och se om du har rätt.</p>
+        <button id="start-quiz">Starta quiz</button>
+        <p id="quiz-no-cards" class="muted hidden">Du behöver minst ett kort för att köra en quiz.</p>
+      </div>
+
+      <div id="quiz-play" class="panel hidden">
+        <div class="quiz-top">
+          <span id="quiz-progress"></span>
+          <span>Poäng: <strong id="quiz-score">0</strong></span>
+        </div>
+        <div class="progress"><div id="progress-bar"></div></div>
+        <p id="quiz-question" class="question"></p>
+        <form id="answer-form">
+          <input id="answer-input" type="text" placeholder="Ditt svar..." autocomplete="off">
+          <button type="submit" id="check-btn">Svara</button>
+        </form>
+        <div id="feedback" class="feedback hidden"></div>
+        <div class="row hidden" id="after-answer">
+          <button id="override-btn" class="secondary small hidden">Jag hade faktiskt rätt</button>
+          <button id="next-btn">Nästa →</button>
+        </div>
+      </div>
+
+      <div id="quiz-result" class="panel center hidden">
+        <h3>Klart! 🎉</h3>
+        <p class="big"><span id="final-score"></span></p>
+        <p id="final-msg" class="muted"></p>
+        <button id="restart-quiz">Kör igen</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
