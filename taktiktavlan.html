@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Taktiktavlan ⚽ – fotbollstaktik mot dina kompisar</title>
+<style>
+  :root { --blue:#2563eb; --blueD:#1e3a8a; --red:#dc2626; --redD:#7f1d1d; --bg:#0c1f14; --panel:#122a1b; --line:#2b5a3c; --text:#eef5f0; --muted:#9cc2a9; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-user-select:none; user-select:none; overflow:hidden; }
+  #app { display:flex; height:100%; gap:10px; padding:10px; }
+  #app.portrait { flex-direction:column; }
+  #boardWrap { flex:1; display:grid; place-items:center; min-width:0; min-height:0; }
+  #board { position:relative; border-radius:10px; box-shadow:0 10px 30px #0008; }
+  #board svg { position:absolute; inset:0; width:100%; height:100%; }
+  .token { position:absolute; border-radius:50%; display:grid; place-items:center; font-weight:800; color:#fff;
+    transition:left .35s ease, top .35s ease, opacity .2s, transform .15s; cursor:pointer; border:3px solid; z-index:3;
+    box-shadow:0 3px 6px #0006; line-height:1; }
+  .token .role { font-size:.62em; opacity:.85; font-weight:700; }
+  .token.t0 { background:var(--blue); border-color:var(--blueD); }
+  .token.t1 { background:var(--red); border-color:var(--redD); }
+  .token.mv.t0 { background:#0d9488; } .token.mv.t1 { background:#9333ea; }
+  .token.done { opacity:.5; }
+  .token.sel { transform:scale(1.15); box-shadow:0 0 0 3px #fde047, 0 3px 10px #000a; }
+  .token .ballIcon { position:absolute; right:-28%; bottom:-22%; font-size:.95em; filter:drop-shadow(0 1px 2px #000); }
+  .hl { position:absolute; z-index:2; display:grid; place-items:center; font-weight:800; cursor:pointer; border-radius:8px; }
+  .hl.move { background:#ffffff26; }
+  .hl.move:hover { background:#ffffff44; }
+  .hl .dot { width:22%; height:22%; border-radius:50%; background:#fff9; }
+  .badge { position:absolute; z-index:6; pointer-events:none; font-weight:800; border-radius:99px; padding:0 5px;
+    color:#111; box-shadow:0 2px 4px #0007; white-space:nowrap; transform:translate(-50%,-50%); }
+  .good { background:#4ade80; } .mid { background:#facc15; } .bad { background:#f87171; }
+  .hl.target { border:3px dashed #fde047; border-radius:50%; background:transparent; }
+  .hint-ring { position:absolute; z-index:1; border-radius:50%; box-shadow:0 0 0 4px #38bdf8, 0 0 20px #38bdf8; animation:pulse 1s infinite alternate; pointer-events:none; }
+  @keyframes pulse { to { box-shadow:0 0 0 7px #38bdf8, 0 0 30px #38bdf8; } }
+
+  #panel { width:290px; flex-shrink:0; display:flex; flex-direction:column; gap:8px; overflow:auto; }
+  #app.portrait #panel { width:100%; height:38%; }
+  #boardWrap { overflow:hidden; }
+  .box { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+  .score { display:flex; align-items:center; justify-content:space-between; font-weight:800; font-size:20px; }
+  .score .n { font-size:26px; font-variant-numeric:tabular-nums; }
+  .tname { display:flex; align-items:center; gap:6px; font-size:15px; }
+  .chip { width:12px; height:12px; border-radius:50%; display:inline-block; }
+  .turn { display:flex; justify-content:space-between; align-items:center; font-weight:700; }
+  .ap { display:flex; gap:5px; }
+  .ap span { width:14px; height:14px; border-radius:50%; background:#fde047; box-shadow:0 0 6px #fde04788; }
+  .ap span.used { background:#334; box-shadow:none; }
+  .muted { color:var(--muted); font-size:13px; }
+  .info h4 { margin:0 0 4px; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; text-align:center; font-size:12px; }
+  .stats b { display:block; font-size:16px; }
+  .btns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  button { font:inherit; font-weight:800; border:none; border-radius:10px; padding:10px; cursor:pointer; color:#fff;
+    background:#2b5a3c; box-shadow:0 3px 0 #0006; }
+  button:active { transform:translateY(2px); box-shadow:0 1px 0 #0006; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.shoot { background:#dc2626; grid-column:span 2; font-size:16px; }
+  button.end { background:#475569; }
+  button.coach { background:#0284c7; }
+  #log { font-size:13px; line-height:1.45; max-height:150px; overflow:auto; }
+  #log div { padding:2px 0; border-bottom:1px solid #ffffff10; }
+  #app.portrait #log { max-height:70px; }
+
+  #toast { position:fixed; left:50%; top:16px; transform:translate(-50%,-20px); opacity:0; z-index:20;
+    background:#000d; padding:10px 18px; border-radius:12px; font-weight:800; font-size:17px; transition:.25s; text-align:center; pointer-events:none; max-width:92vw; }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  #toast small { display:block; font-weight:600; color:#cbd5e1; font-size:13px; margin-top:2px; }
+
+  .overlay { position:fixed; inset:0; background:#000b; display:grid; place-items:center; z-index:30; padding:14px; }
+  .card { background:var(--panel); border:2px solid var(--line); border-radius:18px; padding:20px 22px; width:min(560px,100%);
+    max-height:100%; overflow:auto; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 4px; font-size:30px; text-align:center; }
+  .card .sub { text-align:center; color:var(--muted); margin:0 0 14px; }
+  .card h3 { margin:14px 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .teams { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .teamcfg { border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .teamcfg input { width:100%; font:inherit; font-weight:700; background:#0006; color:#fff; border:1px solid var(--line);
+    border-radius:8px; padding:7px 9px; margin-bottom:8px; }
+  .opts { display:flex; flex-wrap:wrap; gap:6px; }
+  .opt { background:#0005; border:1px solid var(--line); box-shadow:none; padding:7px 9px; font-size:13px; }
+  .opt.sel { background:#fde047; color:#111; border-color:#fde047; }
+  .fdesc { font-size:12px; color:var(--muted); margin-top:6px; min-height:2.6em; }
+  .go { width:100%; margin-top:16px; background:var(--blue); font-size:18px; padding:13px; }
+  .rules { font-size:14px; line-height:1.55; color:#d6e9dc; }
+  .rules li { margin:3px 0; }
+  .endstats { display:grid; grid-template-columns:1fr auto 1fr; gap:6px 14px; margin:14px 0; font-variant-numeric:tabular-nums; }
+  .endstats .l { text-align:right; font-weight:700; } .endstats .m { color:var(--muted); text-align:center; } .endstats .r { font-weight:700; }
+  .hidden { display:none !important; }
+  #bigGoal { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; z-index:25; }
+  #bigGoal span { font-size:clamp(50px,13vw,140px); font-weight:900; color:#fde047; text-shadow:0 6px 0 #0009; transform:scale(0); }
+  #bigGoal span.on { animation:pop .5s cubic-bezier(.2,1.6,.4,1) forwards; }
+  @keyframes pop { to { transform:scale(1) rotate(-5deg); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="boardWrap"><div id="board"></div></div>
+  <div id="panel">
+    <div class="box">
+      <div class="score">
+        <span class="tname"><span class="chip" style="background:var(--blue)"></span><span id="n0">Blå</span></span>
+        <span><span class="n" id="s0">0</span> – <span class="n" id="s1">0</span></span>
+        <span class="tname"><span id="n1">Röd</span><span class="chip" style="background:var(--red)"></span></span>
+      </div>
+      <div class="muted" style="text-align:center" id="round"></div>
+    </div>
+    <div class="box">
+      <div class="turn"><span id="turnTxt"></span><span class="ap" id="ap"></span></div>
+      <div class="muted" id="phase" style="margin-top:4px"></div>
+    </div>
+    <div class="box info" id="info"><span class="muted">Tryck på en av dina spelare.</span></div>
+    <div class="btns">
+      <button class="shoot hidden" id="btnShoot">⚽ Skjut</button>
+      <button class="coach" id="btnCoach">🧠 Tränartips</button>
+      <button class="end" id="btnEnd">Avsluta tur ⏭</button>
+    </div>
+    <div class="box"><div id="log"></div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="bigGoal"><span id="bigTxt">MÅÅÅL!</span></div>
+
+<div id="setup" class="overlay">
+  <div class="card">
+    <h1>⚽ Taktiktavlan</h1>
+    <p class="sub">Turbaserad fotbollstaktik. Spela mot en kompis på samma skärm, eller mot datorn.</p>
+    <h3>Motståndare</h3>
+    <div class="opts" id="modeOpts">
+      <button class="opt sel" data-mode="pvp">👥 Mot en kompis</button>
+      <button class="opt" data-mode="cpu">🤖 Mot datorn</button>
+    </div>
+    <h3>Lag och formation</h3>
+    <div class="teams">
+      <div class="teamcfg"><input id="name0" value="Blå" maxlength="14"><div class="opts" data-team="0"></div><div class="fdesc" id="fd0"></div></div>
+      <div class="teamcfg"><input id="name1" value="Röd" maxlength="14"><div class="opts" data-team="1"></div><div class="fdesc" id="fd1"></div></div>
+    </div>
+    <h3>Matchlängd</h3>
+    <div class="opts" id="lenOpts">
+      <button class="opt" data-len="6">Snabb (6 drag/lag)</button>
+      <button class="opt sel" data-len="10">Normal (10)</button>
+      <button class="opt" data-len="15">Lång (15)</button>
+    </div>
+    <h3>Så funkar det</h3>
+    <ul class="rules">
+      <li>Lagen turas om. Varje tur har du <b>3 handlingar</b>. Varje spelare får <b>flytta en gång</b> och göra <b>en bollhandling</b> (passa, skjuta eller tackla) per tur.</li>
+      <li>Varje drag visar <b>chansen i procent</b>. Fria mottagare, korta passningar och skott nära mål med bra vinkel ger hög chans.</li>
+      <li>Motståndare nära passningslinjen kan <b>bryta passningen</b>. Motståndare bredvid mottagaren gör passningen svårare.</li>
+      <li>Springer du med bollen bredvid motståndare kan de <b>ta bollen</b>. Misslyckas ett drag är turen slut.</li>
+      <li>När du inte har bollen: <b>markera, stäng passningsvägar och tackla</b> (max <b>en tackling per tur</b>, så välj rätt läge). Den som blir tacklad ligger kvar i gräset under sin nästa tur 💫. Lyckas tacklingen kan du anfalla direkt med de handlingar du har kvar!</li>
+      <li>Målvakten får bara röra sig i straffområdet. Står den i skottlinjen blir skotten mycket svårare.</li>
+      <li>Fastnat? Tryck <b>🧠 Tränartips</b>.</li>
+    </ul>
+    <button class="go" id="btnStart">Avspark!</button>
+  </div>
+</div>
+
+<div id="handover" class="overlay hidden">
+  <div class="card" style="text-align:center">
+    <h1 id="hoTitle"></h1>
+    <p class="sub" id="hoSub"></p>
+    <button class="go" id="hoGo">Kör! 💪</button>
+  </div>
+</div>
+
+<div id="end" class="overlay hidden">
+  <div class="card">
+    <h1 id="endTitle"></h1>
+    <p class="sub" id="endSub"></p>
+    <div class="endstats" id="endStats"></div>
+    <button class="go" id="btnRematch">Revansch (samma lag)</button>
+    <button class="go" id="btnNew" style="background:#2b5a3c;margin-top:8px">Ny match</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ============ Regler och data ============
+const COLS = 15, ROWS = 9, GOAL_TOP = 3, GOAL_BOT = 5, AP_PER_TURN = 3;
+const ROLES = {
+  MV: { spd: 2, pas: 3, sht: 1, tkl: 2, name: "Målvakt" },
+  B:  { spd: 2, pas: 2, sht: 1, tkl: 4, name: "Back" },
+  MF: { spd: 3, pas: 4, sht: 2, tkl: 3, name: "Mittfältare" },
+  A:  { spd: 3, pas: 2, sht: 4, tkl: 1, name: "Anfallare" },
+};
+// [roll, x, y, nummer] för laget som anfaller åt höger
+const FORMATIONS = {
+  "2-2-1": { name: "2-2-1", desc: "Balanserad. Två backar, två mittfältare och en anfallare.",
+    pos: [["MV",0,4,1],["B",3,2,2],["B",3,6,3],["MF",5,3,6],["MF",5,5,8],["A",6,4,9]] },
+  "3-1-1": { name: "3-1-1", desc: "Betongen. Tre backar som tacklar hårt, men få passningsalternativ framåt.",
+    pos: [["MV",0,4,1],["B",3,1,2],["B",2,4,4],["B",3,7,3],["MF",5,4,8],["A",6,4,9]] },
+  "1-2-2": { name: "1-2-2", desc: "Anfallsglad. Två anfallare som skjuter bra, men bara en back bakom.",
+    pos: [["MV",0,4,1],["B",2,4,4],["MF",4,2,6],["MF",4,6,8],["A",6,3,9],["A",6,5,11]] },
+};
+const SHOT_BASE = { 1: 60, 2: 52, 3: 40, 4: 28, 5: 18, 6: 10 };
+const GOAL_VALUE = 10, LOSS_COST = 2.5;
+
+// ============ Hjälp ============
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1);
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+const cls = (c) => (c >= 65 ? "good" : c >= 35 ? "mid" : "bad");
+
+// ============ Tillstånd ============
+const cfg = { mode: "pvp", len: 10, form: ["2-2-1", "2-2-1"], names: ["Blå", "Röd"] };
+let S = null;     // matchtillstånd
+let selected = null, busy = false, hint = null;
+
+function newMatch() {
+  S = {
+    players: [], ball: null, turnTeam: 0, turnsPlayed: [0, 0], ap: AP_PER_TURN, score: [0, 0],
+    log: [], over: false,
+    stats: [0, 1].map(() => ({ pass: 0, passOk: 0, shots: 0, tackle: 0, tackleOk: 0, dribble: 0, dribbleOk: 0 })),
+  };
+  let id = 0;
+  for (let t = 0; t < 2; t++) {
+    for (const [role, x, y, num] of FORMATIONS[cfg.form[t]].pos) {
+      S.players.push({ id: id++, team: t, role, num, hx: t === 0 ? x : COLS - 1 - x, hy: y, x: 0, y: 0, moved: false, acted: false, ...ROLES[role] });
+    }
+  }
+  $("n0").textContent = cfg.names[0]; $("n1").textContent = cfg.names[1];
+  const starter = Math.random() < 0.5 ? 0 : 1;
+  addLog(`🪙 ${cfg.names[starter]} vann slantsinglingen och gör avspark.`);
+  kickoff(starter);
+  relayout();
+  startTurnUI();
+}
+
+function kickoff(team) {
+  for (const p of S.players) {
+    p.x = p.hx; p.y = p.hy; p.moved = p.acted = p.down = false;
+    if (p.team !== team && p.role === "A") p.x = p.team === 0 ? 5 : COLS - 6;
+  }
+  const kicker = S.players.find((p) => p.team === team && p.role === "A");
+  kicker.x = 7; kicker.y = 4;
+  S.ball = kicker.id;
+  S.turnTeam = team; S.ap = AP_PER_TURN; S.ending = false; S.tackled = false;
+  selected = null; hint = null;
+}
+
+const P = (id) => S.players[id];
+const carrier = () => P(S.ball);
+const at = (x, y) => S.players.find((p) => p.x === x && p.y === y);
+const opponents = (team) => S.players.filter((p) => p.team !== team);
+const mates = (team) => S.players.filter((p) => p.team === team);
+const inBox = (team, x, y) => (team === 0 ? x <= 2 : x >= COLS - 3) && y >= 2 && y <= 6;
+const goalDx = (team, x) => (team === 0 ? COLS - x : x + 1);
+
+// ============ Sannolikheter ============
+function shotChance(team, x, y, sht) {
+  const dx = goalDx(team, x);
+  if (dx > 6) return 0;
+  let c = SHOT_BASE[dx] * (0.55 + sht * 0.15);
+  const dy = y < GOAL_TOP ? GOAL_TOP - y : y > GOAL_BOT ? y - GOAL_BOT : 0;
+  c -= dy * 10;
+  const gx = team === 0 ? COLS - 0.5 : -0.5, gy = clamp(y, GOAL_TOP, GOAL_BOT);
+  for (const o of opponents(team)) {
+    const d = segDist(o.x, o.y, x, y, gx, gy);
+    if (o.role === "MV") { if (d <= 1) c -= 18; else if (d > 2.2) c += 10; }
+    else if (d < 0.75 && !(o.x === x && o.y === y)) c -= 12;
+  }
+  return clamp(Math.round(c), 3, 90);
+}
+
+function passInfo(p, m, from = p) {
+  const d = cheb(from, m), range = 3 + p.pas;
+  if (d > range) return null;
+  let c = 98 - Math.max(0, d - 2) * (10 - p.pas * 1.5);
+  const inter = [];
+  for (const o of opponents(p.team)) {
+    if ((o.x === from.x && o.y === from.y) || (o.x === m.x && o.y === m.y)) continue;
+    if (segDist(o.x, o.y, from.x, from.y, m.x, m.y) < 0.75) { c -= 18; inter.push(o); }
+    if (cheb(o, m) === 1) c -= 8;
+  }
+  inter.sort((a, b) => cheb(a, from) - cheb(b, from));
+  return { chance: clamp(Math.round(c), 5, 98), inter };
+}
+
+function dribbleInfo(p, x, y) {
+  const tacklers = opponents(p.team).filter((o) => cheb(o, { x, y }) <= 1);
+  let ok = 1;
+  for (const o of tacklers) ok *= 1 - (15 + o.tkl * 8) / 100;
+  tacklers.sort((a, b) => b.tkl - a.tkl);
+  return { chance: Math.round(ok * 100), tacklers };
+}
+const tackleChance = (t) => clamp(10 + t.tkl * 9, 5, 90);
+
+// Hur farlig är en spelare på en viss ruta (för tränaren och datorn)
+function threat(team, x, y, sht) {
+  const prog = (team === 0 ? x : COLS - 1 - x) / (COLS - 1);
+  return (shotChance(team, x, y, sht) / 100) * GOAL_VALUE * 0.6 + prog * 2;
+}
+
+// Risk att bli av med bollen nästa tur om bollhållaren står här
+function risk(team, x, y, ignoreId = -1) {
+  let r = 0;
+  for (const o of opponents(team)) {
+    if (o.id === ignoreId) continue;
+    const reach = o.role === "MV" ? 1 : o.spd + 1;
+    if (Math.max(Math.abs(o.x - x), Math.abs(o.y - y)) <= reach) r = Math.max(r, tackleChance(o) / 100);
+  }
+  return r;
+}
+// Värdet av att ha bollen på en ruta: hot minus risk
+const holdValue = (team, x, y, sht) => threat(team, x, y, sht) - risk(team, x, y) * LOSS_COST;
+
+// ============ Möjliga drag ============
+function moveTargets(p) {
+  if (p.moved || p.down) return [];
+  const isC = S.ball === p.id;
+  const r = isC ? Math.max(1, p.spd - 1) : p.spd, out = [];
+  for (let x = p.x - r; x <= p.x + r; x++) for (let y = p.y - r; y <= p.y + r; y++) {
+    if (x < 0 || y < 0 || x >= COLS || y >= ROWS || (x === p.x && y === p.y) || at(x, y)) continue;
+    if (p.role === "MV" && !inBox(p.team, x, y)) continue;
+    out.push({ x, y, ...(isC ? dribbleInfo(p, x, y) : {}) });
+  }
+  return out;
+}
+function passTargets(p) {
+  if (p.acted || S.ball !== p.id) return [];
+  return mates(p.team).filter((m) => m !== p).map((m) => ({ m, info: passInfo(p, m) })).filter((o) => o.info);
+}
+function canShoot(p) { return S.ball === p.id && !p.acted && shotChance(p.team, p.x, p.y, p.sht) > 0; }
+function canTackle(p) {
+  const c = carrier();
+  return !p.acted && !p.down && !S.tackled && c.team !== p.team && cheb(p, c) === 1;
+}
+
+// ============ Handlingar ============
+function roll(chance) { const r = Math.floor(Math.random() * 100) + 1; return { r, ok: r <= chance }; }
+
+async function doMove(p, x, y) {
+  const isC = S.ball === p.id;
+  const info = isC ? dribbleInfo(p, x, y) : null;
+  p.x = x; p.y = y; p.moved = true;
+  spendAp();
+  if (isC && info.tacklers.length) {
+    S.stats[p.team].dribble++;
+    const { r, ok } = roll(info.chance);
+    if (ok) {
+      S.stats[p.team].dribbleOk++;
+      toast(`💨 Dribblingen lyckades!`, `${info.chance}% chans, slog ${r}`);
+      addLog(`💨 #${p.num} dribblade förbi (${info.chance}%).`);
+    } else {
+      const t = info.tacklers[0];
+      S.ball = t.id;
+      toast(`🛑 Bollen tappad!`, `${info.chance}% chans, slog ${r}. #${t.num} tog bollen.`);
+      addLog(`🛑 #${p.num} tappade bollen till #${t.num} (${info.chance}%).`);
+      return turnover();
+    }
+  }
+  afterAction();
+}
+
+async function doPass(p, m) {
+  const info = passInfo(p, m);
+  p.acted = true; spendAp();
+  S.stats[p.team].pass++;
+  const { r, ok } = roll(info.chance);
+  if (ok) {
+    S.stats[p.team].passOk++;
+    S.ball = m.id;
+    toast(`✅ Passning lyckades!`, `${info.chance}% chans, slog ${r}`);
+    addLog(`➡️ #${p.num} passade till #${m.num} (${info.chance}%).`);
+    selected = m.team === S.turnTeam && !isCpuTurn() ? m.id : null;
+    afterAction();
+  } else {
+    const thief = info.inter[0] || opponents(p.team).sort((a, b) => cheb(a, m) - cheb(b, m))[0];
+    S.ball = thief.id;
+    toast(`❌ Passningen bröts!`, `${info.chance}% chans, slog ${r}. #${thief.num} tog bollen.`);
+    addLog(`❌ #${p.num}s passning bröts av #${thief.num} (${info.chance}%).`);
+    turnover();
+  }
+}
+
+async function doShoot(p) {
+  const c = shotChance(p.team, p.x, p.y, p.sht);
+  p.acted = true; spendAp();
+  S.stats[p.team].shots++;
+  const { r, ok } = roll(c);
+  if (ok) {
+    S.score[p.team]++;
+    addLog(`⚽ MÅL! #${p.num} satte den (${c}%).`);
+    toast(`⚽ MÅÅÅL för ${cfg.names[p.team]}!`, `${c}% chans, slog ${r}`);
+    S.ending = true;
+    bigGoal();
+    render();
+    busy = true;
+    await sleep(1600);
+    busy = false;
+    S.turnsPlayed[p.team]++;
+    const other = 1 - p.team;
+    if (checkEnd()) return;
+    kickoff(other);
+    addLog(`🔄 Avspark för ${cfg.names[other]}.`);
+    startTurnUI();
+  } else {
+    const k = S.players.find((q) => q.team !== p.team && q.role === "MV");
+    S.ball = k.id;
+    toast(`🧤 Räddat/utanför!`, `${c}% chans, slog ${r}. Målvakten har bollen.`);
+    addLog(`🧤 #${p.num} sköt men missade (${c}%).`);
+    turnover();
+  }
+}
+
+async function doTackle(t) {
+  const c = carrier(), ch = tackleChance(t);
+  t.acted = true; S.tackled = true; spendAp();
+  S.stats[t.team].tackle++;
+  const { r, ok } = roll(ch);
+  if (ok) {
+    S.stats[t.team].tackleOk++;
+    S.ball = t.id; c.down = true;
+    toast(`💥 Tacklingen lyckades!`, `${ch}% chans, slog ${r}. #${c.num} ligger kvar en tur.`);
+    addLog(`💥 #${t.num} tacklade #${c.num} och vann bollen (${ch}%).`);
+  } else {
+    t.moved = true; // ramlade
+    toast(`😵 Tacklingen missade`, `${ch}% chans, slog ${r}. #${t.num} ligger i gräset.`);
+    addLog(`😵 #${t.num} missade tacklingen (${ch}%).`);
+  }
+  afterAction();
+}
+
+function spendAp() { S.ap--; hint = null; }
+
+function afterAction() {
+  render();
+  if (S.ap <= 0) { S.ending = true; setTimeout(endTurn, 900); }
+}
+
+function turnover() {
+  selected = null; S.ending = true;
+  render();
+  setTimeout(endTurn, 1100);
+}
+
+function checkEnd() {
+  if (S.turnsPlayed[0] >= cfg.len && S.turnsPlayed[1] >= cfg.len) { endMatch(); return true; }
+  return false;
+}
+
+function endTurn() {
+  if (S.over) return;
+  S.turnsPlayed[S.turnTeam]++;
+  for (const p of mates(S.turnTeam)) p.down = false;
+  if (checkEnd()) return;
+  S.turnTeam = 1 - S.turnTeam;
+  S.ap = AP_PER_TURN; S.ending = false; S.tackled = false;
+  for (const p of S.players) p.moved = p.acted = false;
+  selected = null; hint = null;
+  startTurnUI();
+}
+
+function isCpuTurn() { return cfg.mode === "cpu" && S.turnTeam === 1; }
+
+function startTurnUI() {
+  render();
+  if (isCpuTurn()) { runCpu(); return; }
+  if (cfg.mode === "pvp") {
+    const t = S.turnTeam, has = carrier().team === t;
+    $("hoTitle").innerHTML = `<span class="chip" style="width:20px;height:20px;background:var(--${t ? "red" : "blue"})"></span> ${esc(cfg.names[t])}s tur`;
+    $("hoSub").textContent = has ? "Ni har bollen. Bygg ett anfall!" : "Motståndarna har bollen. Försvara och vinn tillbaka den!";
+    $("handover").classList.remove("hidden");
+  }
+}
+
+function endMatch() {
+  S.over = true;
+  render();
+  const [a, b] = S.score;
+  const w = a === b ? null : a > b ? 0 : 1;
+  $("endTitle").textContent = w === null ? "🤝 Oavgjort!" : `🏆 ${cfg.names[w]} vinner!`;
+  $("endSub").textContent = w === null ? "Jämn taktisk kamp. Revansch?" : `${a}–${b}. ${cfg.names[1 - w]} får fundera över sin taktik.`;
+  const s = S.stats, pct = (x, y) => (y ? Math.round((x / y) * 100) + "%" : "–");
+  const rows = [
+    ["Mål", a, b], ["Skott", s[0].shots, s[1].shots],
+    ["Passningar", `${s[0].passOk}/${s[0].pass}`, `${s[1].passOk}/${s[1].pass}`],
+    ["Passningsprocent", pct(s[0].passOk, s[0].pass), pct(s[1].passOk, s[1].pass)],
+    ["Lyckade dribblingar", `${s[0].dribbleOk}/${s[0].dribble}`, `${s[1].dribbleOk}/${s[1].dribble}`],
+    ["Lyckade tacklingar", `${s[0].tackleOk}/${s[0].tackle}`, `${s[1].tackleOk}/${s[1].tackle}`],
+  ];
+  $("endStats").innerHTML = `<div class="l">${esc(cfg.names[0])}</div><div class="m"></div><div class="r">${esc(cfg.names[1])}</div>` +
+    rows.map(([m, l, r]) => `<div class="l">${l}</div><div class="m">${m}</div><div class="r">${r}</div>`).join("");
+  $("end").classList.remove("hidden");
+}
+
+// ============ Tränaren (och datorns hjärna) ============
+function bestAction(team) {
+  const c = carrier(), opts = [];
+  const myPlayers = mates(team);
+  if (c.team === team) {
+    const now = holdValue(team, c.x, c.y, c.sht);
+    if (canShoot(c)) {
+      const sc = shotChance(team, c.x, c.y, c.sht) / 100;
+      opts.push({ type: "shoot", p: c, chance: Math.round(sc * 100), ev: sc * GOAL_VALUE - (1 - sc) * 1 - now,
+        text: `Skjut med #${c.num}! ${Math.round(sc * 100)}% chans.` });
+    }
+    for (const { m, info } of passTargets(c)) {
+      const pc = info.chance / 100;
+      const after = holdValue(team, m.x, m.y, m.sht) + (m.acted ? -0.3 : 0.15);
+      opts.push({ type: "pass", p: c, m, chance: info.chance, ev: pc * after - (1 - pc) * LOSS_COST - now,
+        text: `Passa från #${c.num} till #${m.num} (${info.chance}%)${info.inter.length ? "" : ", fri passningsväg"}.` });
+    }
+    for (const t of moveTargets(c)) {
+      const dc = t.chance / 100;
+      const ev = dc * holdValue(team, t.x, t.y, c.sht) - (1 - dc) * LOSS_COST - now;
+      opts.push({ type: "move", p: c, x: t.x, y: t.y, chance: t.chance, ev,
+        text: `Driv bollen framåt med #${c.num}${t.tacklers.length ? ` (${t.chance}% att klara sig förbi)` : " till fri yta"}.` });
+    }
+    // stödlöpningar: ställ dig fri för en passning
+    for (const p of myPlayers) {
+      if (p === c || p.moved || p.role === "MV") continue;
+      const cur = passInfo(c, p, c);
+      const curV = cur ? (cur.chance / 100) * Math.max(0, holdValue(team, p.x, p.y, p.sht)) : 0;
+      let best = null;
+      for (const t of moveTargets(p)) {
+        const ghost = { ...p, x: t.x, y: t.y };
+        const inf = passInfo(c, ghost, c);
+        if (!inf) continue;
+        const v = (inf.chance / 100) * Math.max(0, holdValue(team, t.x, t.y, p.sht));
+        if (!best || v > best.v) best = { v, t };
+      }
+      if (best && best.v > curV + 0.05) {
+        opts.push({ type: "move", p, x: best.t.x, y: best.t.y, ev: (best.v - curV) * (S.ap > 1 ? 0.6 : 0.15),
+          text: `Spring #${p.num} till fri yta så att #${c.num} kan passa.` });
+      }
+    }
+  } else {
+    // försvar
+    for (const p of myPlayers) if (canTackle(p)) {
+      const tc = tackleChance(p) / 100;
+      opts.push({ type: "tackle", p, chance: Math.round(tc * 100), ev: tc * 3 - (1 - tc) * 0.4,
+        text: `Tackla med #${p.num} (${Math.round(tc * 100)}%).` });
+    }
+    const dangerOpp = opponents(team).filter((o) => o !== c && o.role !== "MV")
+      .map((o) => ({ o, d: threat(1 - team, o.x, o.y, o.sht) })).sort((a, b) => b.d - a.d);
+    for (const p of myPlayers) {
+      if (p.moved) continue;
+      const tg = moveTargets(p);
+      if (p.role === "MV") {
+        // ställ målvakten i skottlinjen
+        const gx = team === 0 ? 0 : COLS - 1, gy = clamp(c.y, GOAL_TOP, GOAL_BOT);
+        let best = null;
+        for (const t of tg) {
+          const d = segDist(t.x, t.y, c.x, c.y, gx, gy) + Math.abs(t.x - gx) * 0.3;
+          if (!best || d < best.d) best = { d, t };
+        }
+        const curD = segDist(p.x, p.y, c.x, c.y, gx, gy) + Math.abs(p.x - gx) * 0.3;
+        if (best && best.d < curD - 0.4) opts.push({ type: "move", p, x: best.t.x, y: best.t.y, ev: 0.35,
+          text: `Flytta målvakten in i skottlinjen.` });
+        continue;
+      }
+      for (const t of tg) {
+        let ev = 0, why = "";
+        if (cheb(t, c) === 1 && !p.acted) { ev = S.ap >= 2 ? 1.2 * tackleChance(p) / 50 : 0.5; why = `pressa bollhållaren #${c.num}${S.ap >= 2 ? " och tackla sen" : ""}`; }
+        else {
+          for (const { o, d } of dangerOpp.slice(0, 2)) {
+            const marked = myPlayers.some((q) => q !== p && cheb(q, o) === 1);
+            if (cheb(t, o) === 1 && !marked) { const v = d * 0.25; if (v > ev) { ev = v; why = `markera farliga #${o.num}`; } }
+            const lane = segDist(t.x, t.y, c.x, c.y, o.x, o.y);
+            if (lane < 0.75) { const v = d * 0.3; if (v > ev) { ev = v; why = `stänga passningsvägen till #${o.num}`; } }
+          }
+        }
+        if (ev > 0) opts.push({ type: "move", p, x: t.x, y: t.y, ev, text: `Flytta #${p.num} för att ${why}.` });
+      }
+    }
+  }
+  opts.sort((a, b) => b.ev - a.ev);
+  const best = opts[0];
+  if (!best || best.ev < 0.04) return null;
+  return best;
+}
+
+async function execute(a) {
+  if (a.type === "shoot") return doShoot(a.p);
+  if (a.type === "pass") return doPass(a.p, a.m);
+  if (a.type === "move") return doMove(a.p, a.x, a.y);
+  if (a.type === "tackle") return doTackle(a.p);
+}
+
+async function runCpu() {
+  busy = true;
+  const team = S.turnTeam;
+  await sleep(700);
+  while (!S.over && !S.ending && S.turnTeam === team && S.ap > 0) {
+    const a = bestAction(team);
+    if (!a) break;
+    selected = a.p.id; render();
+    await sleep(650);
+    const apBefore = S.ap, turnBefore = S.turnsPlayed[team];
+    await execute(a);
+    selected = null;
+    if (S.turnsPlayed[team] !== turnBefore || S.ap === apBefore) break;
+    await sleep(900);
+    if (S.ap <= 0) { busy = false; return; } // endTurn körs av afterAction
+    if (carrier().team !== team && a.type !== "tackle" && a.type !== "move") break;
+  }
+  await sleep(300);
+  busy = false;
+  if (!S.over && !S.ending && S.turnTeam === team && S.ap > 0) endTurn();
+}
+
+// ============ Rendering ============
+let cs = 40, portrait = false;
+const board = $("board");
+
+function layout() {
+  portrait = innerHeight > innerWidth * 1.05;
+  $("app").classList.toggle("portrait", portrait);
+  const wrap = $("boardWrap").getBoundingClientRect();
+  const lw = portrait ? ROWS : COLS + 1, lh = portrait ? COLS + 1 : ROWS;
+  cs = Math.floor(Math.min(wrap.width / lw, wrap.height / lh));
+  board.style.width = lw * cs + "px"; board.style.height = lh * cs + "px";
+  board.style.fontSize = cs * 0.36 + "px";
+  drawPitch();
+  render();
+}
+function relayout() { layout(); requestAnimationFrame(layout); }
+
+// logisk ruta → pixlar (övre vänstra hörnet)
+function pos(x, y) {
+  return portrait ? { left: y * cs, top: (0.5 + (COLS - 1 - x)) * cs } : { left: (0.5 + x) * cs, top: y * cs };
+}
+
+function drawPitch() {
+  const lw = COLS + 1, vb = portrait ? `0 0 ${ROWS} ${lw}` : `0 0 ${lw} ${ROWS}`;
+  const tr = portrait ? `translate(0 ${lw}) rotate(-90)` : "";
+  let stripes = "";
+  for (let i = 0; i < COLS; i++) stripes += `<rect x="${0.5 + i}" y="0" width="1" height="${ROWS}" fill="${i % 2 ? "#2f8a4a" : "#36994f"}"/>`;
+  let grid = "";
+  for (let i = 1; i < COLS; i++) grid += `<line x1="${0.5 + i}" y1="0" x2="${0.5 + i}" y2="${ROWS}"/>`;
+  for (let j = 1; j < ROWS; j++) grid += `<line x1="0.5" y1="${j}" x2="${COLS + 0.5}" y2="${j}"/>`;
+  const L = `stroke="#fff" stroke-opacity=".85" stroke-width=".06" fill="none"`;
+  board.innerHTML = `<svg viewBox="${vb}" preserveAspectRatio="none"><g transform="${tr}">
+    <rect x="0" y="0" width="${lw}" height="${ROWS}" fill="#256b3a"/>
+    ${stripes}
+    <g stroke="#000" stroke-opacity=".08" stroke-width=".03">${grid}</g>
+    <rect x="0.5" y="0.03" width="${COLS}" height="${ROWS - 0.06}" ${L}/>
+    <line x1="${lw / 2}" y1="0" x2="${lw / 2}" y2="${ROWS}" ${L}/>
+    <circle cx="${lw / 2}" cy="${ROWS / 2}" r="1.4" ${L}/>
+    <rect x="0.5" y="2" width="3" height="5" ${L}/><rect x="${COLS - 2.5}" y="2" width="3" height="5" ${L}/>
+    <rect x="0.02" y="${GOAL_TOP}" width="0.48" height="3" fill="#fff" fill-opacity=".25" stroke="#fff" stroke-width=".08"/>
+    <rect x="${COLS + 0.5}" y="${GOAL_TOP}" width="0.48" height="3" fill="#fff" fill-opacity=".25" stroke="#fff" stroke-width=".08"/>
+  </g></svg><div id="layer"></div>`;
+}
+
+function render() {
+  if (!S) return;
+  const layer = $("layer");
+  if (!layer) return;
+  layer.innerHTML = "";
+  const human = !isCpuTurn() && !busy && !S.over && !S.ending;
+  const sp = selected !== null ? P(selected) : null;
+  const size = cs * 0.78, off = (cs - size) / 2;
+
+  // tips-markering
+  if (hint) {
+    const hp = hint.type === "pass" ? hint.m : hint.type === "move" ? { x: hint.x, y: hint.y } : hint.p;
+    for (const q of [hint.p, hp]) {
+      const { left, top } = pos(q.x, q.y), d = document.createElement("div");
+      d.className = "hint-ring";
+      Object.assign(d.style, { left: left + off + "px", top: top + off + "px", width: size + "px", height: size + "px" });
+      layer.appendChild(d);
+    }
+  }
+
+  // markeringar för vald spelare
+  if (sp && human && sp.team === S.turnTeam && S.ap > 0) {
+    for (const t of moveTargets(sp)) {
+      const { left, top } = pos(t.x, t.y), d = document.createElement("div");
+      d.className = "hl move";
+      Object.assign(d.style, { left: left + 2 + "px", top: top + 2 + "px", width: cs - 4 + "px", height: cs - 4 + "px" });
+      d.innerHTML = t.chance !== undefined && t.tacklers.length ? "" : `<span class="dot"></span>`;
+      d.onclick = (e) => { e.stopPropagation(); act(() => doMove(sp, t.x, t.y)); };
+      layer.appendChild(d);
+      if (t.chance !== undefined && t.tacklers.length) addBadge(layer, t.x, t.y, t.chance, 0);
+    }
+    for (const { m, info } of passTargets(sp)) {
+      const { left, top } = pos(m.x, m.y), d = document.createElement("div");
+      d.className = "hl target";
+      Object.assign(d.style, { left: left - 2 + "px", top: top - 2 + "px", width: cs + 4 + "px", height: cs + 4 + "px", zIndex: 5 });
+      d.onclick = (e) => { e.stopPropagation(); act(() => doPass(sp, m)); };
+      layer.appendChild(d);
+      addBadge(layer, m.x, m.y, info.chance, -0.05);
+    }
+    if (canTackle(sp)) {
+      const c = carrier(), { left, top } = pos(c.x, c.y), d = document.createElement("div");
+      d.className = "hl target";
+      Object.assign(d.style, { left: left - 2 + "px", top: top - 2 + "px", width: cs + 4 + "px", height: cs + 4 + "px", zIndex: 5, borderColor: "#f87171" });
+      d.onclick = (e) => { e.stopPropagation(); act(() => doTackle(sp)); };
+      layer.appendChild(d);
+      addBadge(layer, c.x, c.y, tackleChance(sp), -0.05, "💥 ");
+    }
+  }
+
+  for (const p of S.players) {
+    const { left, top } = pos(p.x, p.y), d = document.createElement("div");
+    const myTurn = p.team === S.turnTeam;
+    const done = p.down || (myTurn && p.moved && (p.acted || S.ball !== p.id));
+    d.className = `token t${p.team} ${p.role === "MV" ? "mv" : ""} ${selected === p.id ? "sel" : ""} ${done ? "done" : ""}`;
+    Object.assign(d.style, { left: left + off + "px", top: top + off + "px", width: size + "px", height: size + "px" });
+    d.innerHTML = `<div style="text-align:center">${p.num}<div class="role">${p.role}</div></div>${S.ball === p.id ? '<span class="ballIcon">⚽</span>' : ""}${p.down ? '<span class="ballIcon" style="right:auto;left:-25%;bottom:auto;top:-25%">💫</span>' : ""}`;
+    d.onclick = (e) => { e.stopPropagation(); clickPlayer(p); };
+    layer.appendChild(d);
+  }
+  renderPanel();
+}
+
+function addBadge(layer, x, y, chance, dyCells, prefix = "") {
+  const { left, top } = pos(x, y), b = document.createElement("div");
+  b.className = "badge " + cls(chance);
+  b.style.left = left + cs / 2 + "px"; b.style.top = top + (dyCells < 0 ? -cs * 0.02 : cs / 2) + "px";
+  b.style.fontSize = Math.max(10, cs * 0.24) + "px";
+  b.textContent = prefix + chance + "%";
+  layer.appendChild(b);
+}
+
+function renderPanel() {
+  $("s0").textContent = S.score[0]; $("s1").textContent = S.score[1];
+  const t = S.turnTeam, round = Math.min(cfg.len, S.turnsPlayed[t] + 1);
+  $("round").textContent = `Drag ${round} av ${cfg.len}`;
+  $("turnTxt").innerHTML = `<span class="chip" style="background:var(--${t ? "red" : "blue"})"></span> ${esc(cfg.names[t])}s tur${isCpuTurn() ? " 🤖" : ""}`;
+  $("ap").innerHTML = Array.from({ length: AP_PER_TURN }, (_, i) => `<span class="${i < S.ap ? "" : "used"}"></span>`).join("");
+  $("phase").textContent = carrier().team === t ? "⚔️ Anfall: ni har bollen" : "🛡️ Försvar: vinn tillbaka bollen";
+
+  const sp = selected !== null ? P(selected) : null;
+  const human = !isCpuTurn() && !busy && !S.over;
+  if (sp) {
+    const r = ROLES[sp.role];
+    let status = sp.down ? "💫 Ligger i gräset efter en tackling" : sp.team !== S.turnTeam ? "Motståndare" : [sp.moved ? "har flyttat" : "kan flytta", sp.acted ? "har agerat" : "kan agera"].join(" · ");
+    $("info").innerHTML = `<h4>#${sp.num} ${r.name} <span class="muted">(${esc(cfg.names[sp.team])})</span></h4>
+      <div class="stats"><div><b>${sp.spd}</b>Fart</div><div><b>${sp.pas}</b>Pass</div><div><b>${sp.sht}</b>Skott</div><div><b>${sp.tkl}</b>Tackl.</div></div>
+      <div class="muted" style="margin-top:6px">${status}</div>`;
+  } else $("info").innerHTML = `<span class="muted">${human ? "Tryck på en av dina spelare för att se dragen och chanserna." : "Datorn tänker... 🤔"}</span>`;
+
+  const shootBtn = $("btnShoot");
+  if (sp && human && sp.team === S.turnTeam && canShoot(sp) && S.ap > 0) {
+    const c = shotChance(sp.team, sp.x, sp.y, sp.sht);
+    shootBtn.textContent = `⚽ Skjut med #${sp.num} (${c}%)`;
+    shootBtn.className = "shoot " + "";
+    shootBtn.style.background = c >= 35 ? "#16a34a" : "#dc2626";
+  } else shootBtn.className = "shoot hidden";
+  $("btnCoach").disabled = !human;
+  $("btnEnd").disabled = !human;
+  $("log").innerHTML = S.log.slice(-30).reverse().map((l) => `<div>${l}</div>`).join("");
+}
+
+function clickPlayer(p) {
+  if (busy || S.over || S.ending || isCpuTurn()) return;
+  // klick på motståndarens bollhållare när vald spelare kan tackla
+  const sp = selected !== null ? P(selected) : null;
+  if (sp && sp.team === S.turnTeam && p.team !== sp.team && S.ball === p.id && canTackle(sp) && S.ap > 0) return act(() => doTackle(sp));
+  if (sp && sp.team === S.turnTeam && p.team === sp.team && p !== sp && S.ball === sp.id && !sp.acted && S.ap > 0) {
+    const pi = passInfo(sp, p);
+    if (pi) return act(() => doPass(sp, p));
+  }
+  selected = selected === p.id ? null : p.id;
+  render();
+}
+
+async function act(fn) {
+  if (busy || S.ap <= 0 || S.ending) return;
+  busy = true;
+  try { await fn(); } finally { busy = false; render(); }
+}
+
+// ============ UI-småsaker ============
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+function addLog(msg) { S.log.push(msg); }
+let toastT;
+function toast(msg, small = "") {
+  const t = $("toast"); t.innerHTML = msg + (small ? `<small>${small}</small>` : "");
+  t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2200);
+}
+function bigGoal() { const b = $("bigTxt"); b.classList.remove("on"); void b.offsetWidth; b.classList.add("on"); setTimeout(() => b.classList.remove("on"), 1600); }
+
+$("btnShoot").onclick = () => { const sp = P(selected); if (sp) act(() => doShoot(sp)); };
+$("btnEnd").onclick = () => { if (!busy && !S.ending && !isCpuTurn()) { addLog(`⏭ ${esc(cfg.names[S.turnTeam])} avslutade turen.`); endTurn(); } };
+$("btnCoach").onclick = () => {
+  if (busy || isCpuTurn()) return;
+  const a = bestAction(S.turnTeam);
+  if (!a) { toast("🧠 Tränaren:", "Inget bra drag kvar. Avsluta turen."); hint = null; }
+  else { toast("🧠 Tränaren säger:", a.text); hint = a; selected = a.p.id; }
+  render();
+};
+board.addEventListener("click", () => { if (!busy) { selected = null; render(); } });
+$("hoGo").onclick = () => $("handover").classList.add("hidden");
+
+// ============ Startmeny ============
+for (const t of [0, 1]) {
+  const box = document.querySelector(`.opts[data-team="${t}"]`);
+  for (const k of Object.keys(FORMATIONS)) {
+    const b = document.createElement("button");
+    b.className = "opt" + (cfg.form[t] === k ? " sel" : ""); b.textContent = FORMATIONS[k].name;
+    b.onclick = () => { cfg.form[t] = k; box.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b)); $("fd" + t).textContent = FORMATIONS[k].desc; };
+    box.appendChild(b);
+  }
+  $("fd" + t).textContent = FORMATIONS[cfg.form[t]].desc;
+}
+function radio(groupId, attr, setter) {
+  document.querySelectorAll(`#${groupId} .opt`).forEach((b) => b.onclick = () => {
+    document.querySelectorAll(`#${groupId} .opt`).forEach((x) => x.classList.toggle("sel", x === b));
+    setter(b.dataset[attr]);
+  });
+}
+radio("modeOpts", "mode", (v) => { cfg.mode = v; if (v === "cpu" && $("name1").value === "Röd") $("name1").value = "Datorn"; if (v === "pvp" && $("name1").value === "Datorn") $("name1").value = "Röd"; });
+radio("lenOpts", "len", (v) => (cfg.len = +v));
+
+$("btnStart").onclick = () => {
+  cfg.names = [$("name0").value.trim() || "Blå", $("name1").value.trim() || "Röd"];
+  $("setup").classList.add("hidden");
+  newMatch();
+};
+$("btnRematch").onclick = () => { $("end").classList.add("hidden"); newMatch(); };
+$("btnNew").onclick = () => { $("end").classList.add("hidden"); $("setup").classList.remove("hidden"); };
+addEventListener("resize", () => { if (S) relayout(); });
+
+// för automatiska tester
+window.__t = { get S() { return S; }, bestAction, execute, endTurn, cfg };
+</script>
+</body>
+</html>
