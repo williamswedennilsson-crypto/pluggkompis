@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pantmaskinen</title>
+<style>
+  :root { --bg:#12151c; --panel:#1c212c; --line:#2e3545; --text:#e9ecf3; --muted:#8d95a8;
+          --green:#3ecf8e; --red:#ff5c7a; --yellow:#ffd166; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg);
+         color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .machine { width:min(440px,94vw); background:linear-gradient(#d9dde4,#b8bec9); border-radius:22px;
+             padding:18px; box-shadow:0 20px 50px #0008; color:#1b1f27; }
+  .brand { display:flex; justify-content:space-between; align-items:center; font-weight:800;
+           letter-spacing:.05em; margin-bottom:12px; }
+  .brand small { font-weight:600; color:#4a5263; }
+  .screen { background:#0d2a1f; color:#9bf5c8; border-radius:12px; padding:14px; min-height:84px;
+            font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.95rem; border:3px solid #26313f;
+            box-shadow:inset 0 0 20px #0008; }
+  .screen .big { font-size:1.6rem; font-weight:700; color:#d6ffe9; }
+  .screen.err { background:#3a0f17; color:#ffb3c0; }
+  .hole { margin:16px auto; height:190px; background:radial-gradient(ellipse at center,#222 0,#090909 70%);
+          border-radius:14px; border:6px solid #8f97a5; position:relative; overflow:hidden; }
+  .item { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center;
+          transition:transform .25s ease, opacity .25s; color:#fff; width:90%; }
+  .item .emoji { font-size:4.2rem; line-height:1; filter:drop-shadow(0 4px 8px #000a); }
+  .item .name { margin-top:8px; font-weight:700; }
+  .item .note { color:#aab2c3; font-size:.85rem; }
+  .item.in   { transform:translate(-50%,-50%) scale(.2) translateY(-200px); opacity:0; }
+  .item.trash{ transform:translate(150%,-50%) rotate(40deg); opacity:0; }
+  .timer { height:6px; background:#444b58; border-radius:99px; overflow:hidden; }
+  .timer div { height:100%; background:var(--yellow); width:100%; }
+  .buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  button { font:inherit; font-weight:700; border:none; border-radius:12px; padding:14px; cursor:pointer;
+           color:#fff; box-shadow:0 4px 0 #0005; }
+  button:active { transform:translateY(2px); box-shadow:0 2px 0 #0005; }
+  .pant  { background:#1f9d63; } .sop { background:#c23b54; }
+  .start { background:#3b4bd8; width:100%; margin-top:14px; }
+  .meta { display:flex; justify-content:space-between; margin-top:10px; font-weight:600; color:#3a4152; }
+  .receipt { background:#fff; color:#222; font-family:ui-monospace,Menlo,Consolas,monospace;
+             padding:16px; border-radius:4px; margin-top:14px; font-size:.9rem;
+             box-shadow:0 6px 16px #0004; white-space:pre-wrap; }
+  .hidden { display:none !important; }
+  .hint { color:#4a5263; font-size:.82rem; text-align:center; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="machine">
+  <div class="brand"><span>♻️ PANTOMAT 3000</span><small id="best"></small></div>
+
+  <div class="screen" id="screen">
+    <div class="big">Välkommen!</div>
+    Sortera rätt: panta det som har svenskt pantmärke och går att läsa. Allt annat åker i soporna.
+  </div>
+
+  <div class="hole" id="hole"></div>
+  <div class="timer"><div id="bar"></div></div>
+
+  <div class="buttons hidden" id="buttons">
+    <button class="pant" id="btn-pant">← PANTA</button>
+    <button class="sop" id="btn-sop">SOPORNA →</button>
+  </div>
+  <button class="start" id="start">Starta maskinen</button>
+
+  <div class="meta hidden" id="meta">
+    <span>Kvitto: <span id="kr">0</span> kr</span>
+    <span id="lives">🟢🟢🟢</span>
+  </div>
+  <div class="receipt hidden" id="receipt"></div>
+  <div class="hint">Tangentbord: ← panta, → soporna</div>
+</div>
+
+<script>
+// v = pantvärde i kr (0 = ska i soporna). why = vad maskinen säger om du gör fel.
+const ITEMS = [
+  { e:"🥫", n:"Läskburk 33 cl", note:"Svenskt pantmärke", v:1 },
+  { e:"🥫", n:"Ölburk 50 cl", note:"Svenskt pantmärke", v:1 },
+  { e:"🧴", n:"PET-flaska 50 cl", note:"Svenskt pantmärke", v:1 },
+  { e:"🧴", n:"PET-flaska 1,5 l", note:"Svenskt pantmärke", v:2 },
+  { e:"🧃", n:"Vattenflaska 33 cl", note:"Svenskt pantmärke", v:1 },
+  { e:"🥫", n:"Energidryck", note:"Svenskt pantmärke, lite kladdig", v:1 },
+  { e:"🍷", n:"Vinflaska", note:"Glas utan pantmärke", v:0, why:"Glas utan pant ska till glasigloon." },
+  { e:"🥛", n:"Mjölkpaket", note:"Kartong", v:0, why:"Kartong pantas inte. Pappersinsamlingen!" },
+  { e:"🥫", n:"Tillplattad burk", note:"Någon trampade på den", v:0, why:"FLASKAN KAN INTE LÄSAS. Platta aldrig till burkar." },
+  { e:"🥫", n:"Burk från Tyskland", note:"Pfand-märke, inte svenskt", v:0, why:"Utländsk pant fungerar inte i Sverige." },
+  { e:"🧴", n:"Halvfull läskflaska", note:"Det skvalpar", v:0, why:"Töm flaskan först! Nu kladdar det i maskinen." },
+  { e:"🧦", n:"Ensam strumpa", note:"Var kom den ifrån?", v:0, why:"Det där är en strumpa." },
+  { e:"🔋", n:"AA-batteri", note:"Nästan slut", v:0, why:"Batterier lämnas i batteriholken!" },
+  { e:"🥐", n:"Kanelbulle", note:"Lite mosad", v:0, why:"Ät den istället." },
+  { e:"🧴", n:"Schampoflaska", note:"Plast, men inget pantmärke", v:0, why:"Bara dryckesförpackningar med pantmärke." },
+  { e:"🐈", n:"Katt", note:"Ser misstänksam ut", v:0, why:"Katten ville inte bli pantad. Den gick själv." },
+];
+const PRIZES = [
+  [0, "ingenting. Absolut ingenting."],
+  [5, "en påse lösgodis (väldigt liten)"],
+  [15, "en tidning från 2019"],
+  [25, "en kaffe på macken"],
+  [40, "en kanelbulle och lite självrespekt"],
+  [70, "en fika för två"],
+  [110, "en pizza (utan extra)"],
+  [170, "en månad av stolthet"],
+];
+
+const $ = (id) => document.getElementById(id);
+let kr, lives, streak, current, timeLeft, timeMax, raf, last, busy, log, count;
+
+function say(html, err = false) {
+  $("screen").innerHTML = html;
+  $("screen").classList.toggle("err", err);
+}
+
+function pick() {
+  // ungefär hälften pant, hälften skräp, så man inte kan gissa
+  const pool = ITEMS.filter((i) => (Math.random() < 0.55 ? i.v > 0 : i.v === 0));
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function next() {
+  current = pick();
+  count++;
+  timeMax = Math.max(1.1, 3.2 - count * 0.06);
+  timeLeft = timeMax;
+  $("hole").innerHTML =
+    `<div class="item"><div class="emoji">${current.e}</div>
+     <div class="name">${current.n}</div><div class="note">${current.note}</div></div>`;
+  busy = false;
+}
+
+function start() {
+  kr = 0; lives = 3; streak = 0; count = 0; log = [];
+  $("start").classList.add("hidden");
+  $("receipt").classList.add("hidden");
+  $("buttons").classList.remove("hidden");
+  $("meta").classList.remove("hidden");
+  updateMeta();
+  say(`<div class="big">Lägg i flaska</div>Var god vänta...`);
+  next();
+  last = performance.now();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(tick);
+}
+
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (!busy) {
+    timeLeft -= dt;
+    $("bar").style.width = Math.max(0, timeLeft / timeMax) * 100 + "%";
+    if (timeLeft <= 0) wrong("För långsamt! Kön bakom dig suckar högt.", "trash");
+  }
+  if (lives > 0) raf = requestAnimationFrame(tick);
+}
+
+function choose(pant) {
+  if (busy || lives <= 0 || !current) return;
+  const correct = pant === current.v > 0;
+  if (!correct) {
+    wrong(current.v > 0 ? `Den gick att panta! Du slängde ${current.v} kr.` : current.why, pant ? "in" : "trash");
+    return;
+  }
+  streak++;
+  if (pant) {
+    kr += current.v;
+    log.push(current);
+    const bonus = streak % 10 === 0;
+    if (bonus) kr += 5;
+    say(`<div class="big">+${current.v} kr${bonus ? " (+5 bonus!)" : ""}</div>${streak} rätt i rad`);
+  } else {
+    say(`<div class="big">Rätt!</div>${current.n} åkte i soporna. ${streak} rätt i rad`);
+  }
+  animate(pant ? "in" : "trash");
+}
+
+function wrong(msg, dir) {
+  lives--; streak = 0;
+  say(`<div class="big">⚠ FEL</div>${msg}`, true);
+  animate(dir);
+}
+
+function animate(dir) {
+  busy = true;
+  updateMeta();
+  $("hole").firstChild?.classList.add(dir);
+  setTimeout(() => (lives > 0 ? next() : gameOver()), 320);
+}
+
+function updateMeta() {
+  $("kr").textContent = kr;
+  $("lives").textContent = "🟢".repeat(Math.max(0, lives)) + "🔴".repeat(3 - Math.max(0, lives));
+}
+
+function gameOver() {
+  cancelAnimationFrame(raf);
+  $("hole").innerHTML = "";
+  $("buttons").classList.add("hidden");
+  say(`<div class="big">MASKINEN HAR STOPPAT</div>Kontakta personal.`, true);
+  const best = Math.max(kr, +localStorage.getItem("pantomat.best") || 0);
+  const record = kr > 0 && kr === best && kr > (+localStorage.getItem("pantomat.best") || 0);
+  localStorage.setItem("pantomat.best", best);
+  const prize = PRIZES.filter(([min]) => kr >= min).pop()[1];
+  const cans = log.filter((i) => i.v === 1).length, big = log.filter((i) => i.v === 2).length;
+  $("receipt").textContent =
+`   PANTOMAT 3000 — KVITTO
+------------------------------
+Burkar/små flaskor  ${String(cans).padStart(3)} st
+Stora flaskor       ${String(big).padStart(3)} st
+------------------------------
+ATT HANDLA FÖR:     ${String(kr).padStart(3)} kr
+${record ? "\n★ NYTT REKORD ★\n" : ""}
+Det räcker till:
+${prize}
+
+  Tack för att du pantar!`;
+  $("receipt").classList.remove("hidden");
+  $("start").textContent = "Panta igen";
+  $("start").classList.remove("hidden");
+  showBest();
+}
+
+function showBest() {
+  const b = +localStorage.getItem("pantomat.best") || 0;
+  $("best").textContent = b ? `Rekord: ${b} kr` : "";
+}
+
+$("start").onclick = start;
+$("btn-pant").onclick = () => choose(true);
+$("btn-sop").onclick = () => choose(false);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft") choose(true);
+  if (e.key === "ArrowRight") choose(false);
+  if (e.key === "Enter" && !$("start").classList.contains("hidden")) start();
+});
+showBest();
+</script>
+</body>
+</html>
