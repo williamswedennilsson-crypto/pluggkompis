@@ -19,6 +19,8 @@ document.querySelectorAll(".tab").forEach((tab) => {
     tab.classList.add("active");
     $(tab.dataset.view).classList.add("active");
     if (tab.dataset.view === "quiz") showQuizStart();
+    if (tab.dataset.view === "game") showGameStart();
+    else stopGame();
   });
 });
 
@@ -196,7 +198,7 @@ function showResult() {
   const pct = Math.round((score / deck.length) * 100);
   $("final-score").textContent = `${score} / ${deck.length}`;
   $("final-msg").textContent =
-    pct === 100 ? "Perfekt! Du kan allt! 🌟" :
+    pct === 100 ? (confetti(), "Perfekt! Du kan allt! 🌟") :
     pct >= 70 ? `${pct}% rätt. Snyggt jobbat!` :
     pct >= 40 ? `${pct}% rätt. Fortsätt öva!` :
     `${pct}% rätt. Kör en runda till, det blir bättre!`;
@@ -204,6 +206,213 @@ function showResult() {
 
 $("start-quiz").addEventListener("click", startQuiz);
 $("restart-quiz").addEventListener("click", startQuiz);
+
+// ---------- Konfetti ----------
+function confetti(n = 120) {
+  const colors = ["#7c6cff", "#3ecf8e", "#ff5c7a", "#ffd166", "#4cc9f0"];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = Math.random() * 100 + "vw";
+    c.style.background = colors[i % colors.length];
+    c.style.animationDuration = 1.8 + Math.random() * 2 + "s";
+    c.style.animationDelay = Math.random() * 0.6 + "s";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4500);
+  }
+}
+
+// ---------- Meteorregn ----------
+const STORAGE_BEST = "pluggkompis.meteorBest";
+const game = {
+  running: false,
+  meteors: [],
+  score: 0,
+  lives: 3,
+  combo: 0,
+  elapsed: 0,
+  spawnIn: 0,
+  last: 0,
+  missed: [],
+  bag: [],
+  raf: 0,
+};
+
+function gameShow(id) {
+  ["game-start", "game-play", "game-over"].forEach((p) =>
+    $(p).classList.toggle("hidden", p !== id)
+  );
+}
+
+function showGameStart() {
+  if (game.running) return;
+  gameShow("game-start");
+  $("game-best").textContent = localStorage.getItem(STORAGE_BEST) || 0;
+  $("game-go").disabled = cards.length === 0;
+  $("game-no-cards").classList.toggle("hidden", cards.length > 0);
+}
+
+function nextCard() {
+  // "Påse" så att alla kort kommer innan något upprepas
+  if (!game.bag.length) game.bag = shuffle(cards);
+  return game.bag.pop();
+}
+
+function startGame() {
+  if (!cards.length) return;
+  stopGame();
+  Object.assign(game, {
+    running: true, meteors: [], score: 0, lives: 3, combo: 0,
+    elapsed: 0, spawnIn: 0, last: performance.now(), missed: [], bag: [],
+  });
+  $("sky").querySelectorAll(".meteor, .points").forEach((m) => m.remove());
+  updateHud();
+  gameShow("game-play");
+  $("game-input").value = "";
+  $("game-input").focus();
+  game.raf = requestAnimationFrame(tick);
+}
+
+function stopGame() {
+  game.running = false;
+  cancelAnimationFrame(game.raf);
+}
+
+function spawnMeteor() {
+  const card = nextCard();
+  const el = document.createElement("div");
+  el.className = "meteor";
+  el.textContent = card.q;
+  el.style.left = 15 + Math.random() * 70 + "%";
+  $("sky").appendChild(el);
+  // Fallhastighet (px/s) ökar med tiden
+  const speed = 28 + Math.min(game.elapsed * 0.9, 90) + Math.random() * 10;
+  game.meteors.push({ card, el, y: -40, speed });
+}
+
+function tick(now) {
+  if (!game.running) return;
+  const dt = Math.min((now - game.last) / 1000, 0.1);
+  game.last = now;
+  game.elapsed += dt;
+
+  game.spawnIn -= dt;
+  if (game.spawnIn <= 0 && game.meteors.length < 6) {
+    spawnMeteor();
+    game.spawnIn = Math.max(1.4, 4.5 - game.elapsed * 0.04);
+  }
+
+  const floor = $("sky").clientHeight - 28;
+  for (const m of [...game.meteors]) {
+    m.y += m.speed * dt;
+    m.el.style.top = m.y + "px";
+    if (m.y + m.el.offsetHeight >= floor) impact(m);
+  }
+
+  if (game.running) game.raf = requestAnimationFrame(tick);
+}
+
+function removeMeteor(m) {
+  game.meteors = game.meteors.filter((x) => x !== m);
+}
+
+function impact(m) {
+  removeMeteor(m);
+  m.el.remove();
+  game.lives--;
+  game.combo = 0;
+  game.missed.push(m.card);
+  const sky = $("sky");
+  sky.classList.remove("shake");
+  void sky.offsetWidth;
+  sky.classList.add("shake");
+  updateHud();
+  if (game.lives <= 0) endGame();
+}
+
+function updateHud() {
+  $("game-score").textContent = game.score;
+  $("game-lives").textContent = "❤️".repeat(game.lives) + "🖤".repeat(3 - game.lives);
+  const combo = $("game-combo");
+  combo.textContent = game.combo >= 2 ? `🔥 Kombo x${game.combo}` : "";
+  combo.classList.remove("pop");
+  void combo.offsetWidth;
+  if (game.combo >= 2) combo.classList.add("pop");
+}
+
+$("game-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = $("game-input");
+  const guess = normalize(input.value);
+  if (!guess) return;
+  // Träffa den meteor som ligger längst ner av de som matchar
+  const hit = game.meteors
+    .filter((m) => normalize(m.card.a) === guess)
+    .sort((a, b) => b.y - a.y)[0];
+
+  if (hit) {
+    removeMeteor(hit);
+    game.combo++;
+    const pts = 10 * game.combo + Math.round(hit.y / 20);
+    game.score += pts;
+    const p = document.createElement("div");
+    p.className = "points";
+    p.textContent = "+" + pts;
+    p.style.left = hit.el.style.left;
+    p.style.top = hit.y + "px";
+    $("sky").appendChild(p);
+    setTimeout(() => p.remove(), 800);
+    hit.el.classList.add("boom");
+    setTimeout(() => hit.el.remove(), 400);
+    input.value = "";
+  } else {
+    game.combo = 0;
+    input.classList.remove("wrong");
+    void input.offsetWidth;
+    input.classList.add("wrong");
+    input.select();
+  }
+  updateHud();
+});
+
+function endGame() {
+  stopGame();
+  game.meteors.forEach((m) => m.el.remove());
+  game.meteors = [];
+  const best = Number(localStorage.getItem(STORAGE_BEST) || 0);
+  const record = game.score > best;
+  if (record) {
+    localStorage.setItem(STORAGE_BEST, game.score);
+    confetti();
+  }
+  $("game-final").textContent = game.score + " poäng";
+  $("game-record").textContent = record
+    ? "🏆 Nytt rekord!"
+    : `Rekord: ${best}`;
+
+  const missed = $("game-missed");
+  missed.innerHTML = "";
+  const unique = [...new Map(game.missed.map((c) => [c.id, c])).values()];
+  if (unique.length) {
+    const h = document.createElement("p");
+    h.className = "muted";
+    h.textContent = "Kort som slog ner – värda att öva på:";
+    const ul = document.createElement("ul");
+    for (const c of unique) {
+      const li = document.createElement("li");
+      const a = document.createElement("span");
+      a.className = "a";
+      a.textContent = c.a;
+      li.append(c.q + " → ", a);
+      ul.appendChild(li);
+    }
+    missed.append(h, ul);
+  }
+  gameShow("game-over");
+}
+
+$("game-go").addEventListener("click", startGame);
+$("game-again").addEventListener("click", startGame);
 
 // ---------- Start ----------
 renderCards();

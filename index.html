@@ -13,6 +13,7 @@
       <button class="tab active" data-view="notes">Anteckningar</button>
       <button class="tab" data-view="cards">Flashcards <span id="card-count" class="badge">0</span></button>
       <button class="tab" data-view="quiz">Quiz</button>
+      <button class="tab" data-view="game">☄️ Meteorregn</button>
     </nav>
   </header>
 
@@ -80,6 +81,41 @@
         <p class="big"><span id="final-score"></span></p>
         <p id="final-msg" class="muted"></p>
         <button id="restart-quiz">Kör igen</button>
+      </div>
+    </section>
+
+    <!-- Meteorregn -->
+    <section id="game" class="view">
+      <h2>☄️ Meteorregn</h2>
+
+      <div id="game-start" class="panel center">
+        <p>Dina flashcards faller som meteorer mot jorden. Skriv rätt svar för att spränga dem innan de slår ner!</p>
+        <p class="muted">Tre liv. Kombos ger bonuspoäng. Det går snabbare och snabbare…</p>
+        <p>Rekord: <strong id="game-best">0</strong></p>
+        <button id="game-go">Starta spelet</button>
+        <p id="game-no-cards" class="muted hidden">Du behöver minst ett kort för att spela.</p>
+      </div>
+
+      <div id="game-play" class="hidden">
+        <div class="game-hud">
+          <span id="game-lives">❤️❤️❤️</span>
+          <span id="game-combo" class="combo"></span>
+          <span>Poäng: <strong id="game-score">0</strong></span>
+        </div>
+        <div id="sky" class="sky">
+          <div class="ground"></div>
+        </div>
+        <form id="game-form">
+          <input id="game-input" type="text" placeholder="Skriv ett svar och tryck Enter…" autocomplete="off">
+        </form>
+      </div>
+
+      <div id="game-over" class="panel center hidden">
+        <h3>💥 Jorden är förlorad!</h3>
+        <p class="big" id="game-final">0</p>
+        <p id="game-record" class="muted"></p>
+        <div id="game-missed"></div>
+        <button id="game-again">Spela igen</button>
       </div>
     </section>
   </main>
